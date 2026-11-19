@@ -1,0 +1,112 @@
+name: Continuous Integration
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-install:
+    name: Linux Installation · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Nothing (before)
+        run: |
+          ! command -v artefacts >/dev/null
+          test ! -e "${PREFIX:-/usr/local}/share/artefacts"
+      - name: Install
+        run: ./scripts/install.sh
+      - name: Expose bin on PATH
+        run: echo "${PREFIX:-/usr/local}/bin" >> "$GITHUB_PATH"
+      - name: Check command
+        run: artefacts --version
+      - name: Uninstall
+        if: always()
+        run: ./scripts/uninstall.sh --all
+      - name: Nothing (after)
+        if: always()
+        run: |
+          ! command -v artefacts >/dev/null
+          test ! -e "${PREFIX:-/usr/local}/share/artefacts"
+
+  darwin-install:
+    name: Darwin Installation · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        os: [macos-15-intel, macos-15]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Nothing (before)
+        run: |
+          ! command -v artefacts >/dev/null
+          test ! -e "${PREFIX:-/usr/local}/share/artefacts"
+      - name: Install
+        run: ./scripts/install.sh
+      - name: Expose bin on PATH
+        run: echo "${PREFIX:-/usr/local}/bin" >> "$GITHUB_PATH"
+      - name: Check command
+        run: artefacts --version
+      - name: Uninstall
+        if: always()
+        run: ./scripts/uninstall.sh --all
+      - name: Nothing (after)
+        if: always()
+        run: |
+          ! command -v artefacts >/dev/null
+          test ! -e "${PREFIX:-/usr/local}/share/artefacts"
+
+#  windows-install:
+#    name: Windows Installation
+#    runs-on: windows-latest
+#    steps:
+#      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+#      - name: Nothing (before)
+#        shell: pwsh
+#        run: |
+#          if (Get-Command artefacts -ErrorAction SilentlyContinue) { throw 'artefacts is already on PATH' }
+#          $prefix = if ($env:PREFIX) { $env:PREFIX } else { Join-Path $env:ProgramFiles 'artefacts' }
+#          if (Test-Path (Join-Path $prefix 'share\artefacts')) { throw 'artefacts share directory already exists' }
+#      - name: Install
+#        id: install
+#        shell: pwsh
+#        run: |
+#          & pwsh -NoProfile -File ./scripts/install.ps1
+#          $code = $LASTEXITCODE
+#          if ($code -eq 3) {
+#            # No Windows asset published yet: the script fails fast and leaves nothing behind.
+#            Add-Content $env:GITHUB_OUTPUT 'skipped=true' -Encoding ascii
+#            Write-Host '::notice::No Windows asset in this release; skipping the check command.'
+#          } elseif ($code -ne 0) { exit $code }
+#      - name: Expose bin on PATH
+#        if: steps.install.outputs.skipped != 'true'
+#        shell: pwsh
+#        run: |
+#          $prefix = if ($env:PREFIX) { $env:PREFIX } else { Join-Path $env:ProgramFiles 'artefacts' }
+#          Add-Content $env:GITHUB_PATH (Join-Path $prefix 'bin') -Encoding ascii
+#      - name: Check command
+#        if: steps.install.outputs.skipped != 'true'
+#        shell: pwsh
+#        run: artefacts --version
+#      - name: Uninstall
+#        if: always()
+#        shell: pwsh
+#        run: pwsh -NoProfile -File ./scripts/uninstall.ps1 -All
+#      - name: Nothing (after)
+#        if: always()
+#        shell: pwsh
+#        run: |
+#          if (Get-Command artefacts -ErrorAction SilentlyContinue) { throw 'artefacts is still on PATH' }
+#          $prefix = if ($env:PREFIX) { $env:PREFIX } else { Join-Path $env:ProgramFiles 'artefacts' }
+#          if (Test-Path (Join-Path $prefix 'share\artefacts')) { throw 'artefacts share directory still exists' }
